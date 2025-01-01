@@ -4,7 +4,6 @@ app_publisher = "Gemutanalytics"
 app_description = "Paystack Terminal Integration for ERPNext Healthcare"
 app_email = "dev@gemutanalytics.com"
 app_license = "MIT"
-required_apps = ["erpnext>=15.0.0"]
 
 # DocTypes to be registered
 doctype_list = ["Paystack Settings"]
