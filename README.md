@@ -13,8 +13,7 @@ Paystack Terminal Integration for ERPNext
 
 1. From your site directory:
 
-bash```
-
+```
 bench get-app https://github.com/yourusername/paystack_terminal.git
 bench --site your-site.com install-app paystack_terminal
 ```
