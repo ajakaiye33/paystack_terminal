@@ -1,0 +1,80 @@
+{
+ "actions": [],
+ "creation": "2023-12-30 09:32:42.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "settings_section",
+  "secret_key",
+  "public_key",
+  "terminal_id",
+  "cb_1",
+  "terminal_status"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable Paystack Terminal"
+  },
+  {
+   "depends_on": "enabled",
+   "fieldname": "settings_section",
+   "fieldtype": "Section Break",
+   "label": "Terminal Settings"
+  },
+  {
+   "fieldname": "secret_key",
+   "fieldtype": "Password",
+   "label": "Secret Key",
+   "mandatory_depends_on": "enabled"
+  },
+  {
+   "fieldname": "public_key",
+   "fieldtype": "Data",
+   "label": "Public Key",
+   "mandatory_depends_on": "enabled"
+  },
+  {
+   "fieldname": "terminal_id",
+   "fieldtype": "Data",
+   "label": "Terminal ID",
+   "mandatory_depends_on": "enabled"
+  },
+  {
+   "fieldname": "cb_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "terminal_status",
+   "fieldtype": "Read Only",
+   "label": "Terminal Status",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2023-12-30 09:32:42.000000",
+ "modified_by": "Administrator",
+ "module": "Paystack Terminal",
+ "name": "Paystack Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

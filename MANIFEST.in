@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include paystack_terminal *.css
+recursive-include paystack_terminal *.csv
+recursive-include paystack_terminal *.html
+recursive-include paystack_terminal *.ico
+recursive-include paystack_terminal *.js
+recursive-include paystack_terminal *.json
+recursive-include paystack_terminal *.md
+recursive-include paystack_terminal *.png
+recursive-include paystack_terminal *.py
+recursive-include paystack_terminal *.svg
+recursive-include paystack_terminal *.txt
+recursive-exclude paystack_terminal *.pyc
