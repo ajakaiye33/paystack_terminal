@@ -3,7 +3,7 @@ frappe.ui.form.on('Sales Invoice', {
         if(frm.doc.docstatus === 1 && frm.doc.status !== 'Paid') {
             frm.add_custom_button(__('Pay with Paystack Terminal'), function() {
                 frappe.call({
-                    method: 'paystack_terminal.api.initiate_payment',
+                    method: 'paystack_terminal.api.process_payment',
                     args: {
                         'amount': frm.doc.grand_total,
                         'docname': frm.doc.name
