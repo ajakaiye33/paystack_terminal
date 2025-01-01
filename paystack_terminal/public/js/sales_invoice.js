@@ -6,7 +6,9 @@ frappe.ui.form.on('Sales Invoice', {
                     method: 'paystack_terminal.api.process_payment',
                     args: {
                         'amount': frm.doc.grand_total,
-                        'docname': frm.doc.name
+                        'reference': frm.doc.name,
+                        'invoice': frm.doc.name
+
                     },
                     callback: function(r) {
                         if(r.message) {
