@@ -5,14 +5,14 @@ frappe.ui.form.on('Sales Invoice', {
                 frappe.call({
                     method: 'paystack_terminal.api.process_payment',
                     args: {
-                        'amount': frm.doc.grand_total,
-                        'reference': frm.doc.name,
+                        'amount': frm.doc.grand_total,  // This will be converted in Python
+                        'reference': frm.doc.name,      // Added missing reference
+                        'patient': frm.doc.patient || null,
                         'invoice': frm.doc.name
-
                     },
                     callback: function(r) {
                         if(r.message) {
-                            frappe.msgprint(__('Payment initiated. Reference: ' + r.message));
+                            frappe.msgprint(__('Payment initiated. Reference: ' + r.message.reference));
                         }
                     }
                 });
