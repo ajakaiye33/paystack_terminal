@@ -17,7 +17,7 @@ def process_payment(amount, reference, patient=None, invoice=None):
             "Content-Type": "application/json"
         }
         
-        # Convert amount to kobo (Add this line)
+        # Convert amount to kobo 
         amount_in_kobo = int(float(amount) * 100)
         
         # Create payment request first
@@ -47,7 +47,7 @@ def process_payment(amount, reference, patient=None, invoice=None):
             
         request_data = request_response.json()["data"]
         
-        # Rest of your code remains the same...
+        
         terminal_data = {
             "type": "invoice",
             "action": "process",
@@ -141,7 +141,7 @@ def create_payment_entry(reference, amount):
         "reference_no": reference,
         "reference_date": frappe.utils.today(),
         "party_type": "Customer",
-        "party": "Walk-in Customer"  # You might want to update this based on your needs
+        "party": "Walk-in Customer"  #future consideration
     })
     
     payment.insert(ignore_permissions=True)

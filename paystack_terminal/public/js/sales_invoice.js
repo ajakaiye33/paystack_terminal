@@ -6,7 +6,7 @@ frappe.ui.form.on('Sales Invoice', {
                     method: 'paystack_terminal.api.process_payment',
                     args: {
                         'amount': frm.doc.grand_total,  // This will be converted in Python
-                        'reference': frm.doc.name,      // Added missing reference
+                        'reference': frm.doc.name,      // Add reference
                         'patient': frm.doc.patient || null,
                         'invoice': frm.doc.name
                     },
