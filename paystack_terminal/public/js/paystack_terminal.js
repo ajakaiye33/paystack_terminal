@@ -2,7 +2,7 @@ frappe.provide('paystack_terminal');
 
 paystack_terminal.process_payment = function(amount, callback) {
     frappe.call({
-        method: 'paystack_terminal.paystack_terminal.api.initiate_payment',
+        method: 'paystack_terminal.api.initiate_payment',
         args: {
             amount: amount
         },
