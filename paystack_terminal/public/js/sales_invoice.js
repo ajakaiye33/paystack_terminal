@@ -8,9 +8,12 @@ frappe.ui.form.on('Sales Invoice', {
                     indicator: 'blue'
                 });
                 
+                // Convert amount to kobo
+                const amount_in_kobo = Math.round(frm.doc.grand_total * 100);
+                
                 // Call payment processing
                 paystack_terminal.process_payment({
-                    amount: frm.doc.grand_total,
+                    amount: amount_in_kobo,
                     reference: frm.doc.name,
                     invoice: frm.doc.name,
                     patient: frm.doc.patient

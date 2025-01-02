@@ -17,23 +17,41 @@ def process_payment(amount, reference, invoice=None, patient=None):
             "Content-Type": "application/json"
         }
         
-        # Convert amount to kobo for Paystack
-        amount_in_kobo = int(float(amount) * 100)
+        # Get customer email from Sales Invoice
+        customer_email = None
+        customer_name = None
+        if invoice:
+            sales_invoice = frappe.get_doc('Sales Invoice', invoice)
+            customer_email = frappe.db.get_value('Customer', sales_invoice.customer, 'email_id')
+            customer_name = sales_invoice.customer_name
+        
+        # Convert amount to kobo for Paystack (amount comes as string)
+        amount_in_kobo = int(float(amount))  # Already in kobo from frontend
         
         # First create a payment request
         payment_data = {
             "amount": amount_in_kobo,
-            "email": "customer@example.com",  # Default email
-            "metadata": {
-                "invoice_id": invoice,
-                "reference": reference,
-                "patient": patient
+            "description": f"Payment for Invoice {invoice}",
+            "line_items": [{
+                "name": "Invoice Payment",
+                "amount": str(amount_in_kobo),
+                "quantity": 1
+            }],
+            "customer": {
+                "email": customer_email or "customer@example.com",
+                "name": customer_name or patient or "Customer"
             }
         }
+        
+        # Log the payment request data
+        frappe.logger().debug(f"Payment Request Data: {payment_data}")
         
         # Create payment request
         create_request_url = "https://api.paystack.co/paymentrequest"
         request_response = requests.post(create_request_url, headers=headers, json=payment_data)
+        
+        # Log the complete response
+        frappe.logger().debug(f"Payment Request Response: {request_response.text}")
         
         if request_response.status_code != 200:
             frappe.logger().error(f"Payment Request Error: {request_response.text}")
@@ -46,8 +64,8 @@ def process_payment(amount, reference, invoice=None, patient=None):
             "type": "invoice",
             "action": "process",
             "data": {
-                "id": request_data["id"],  # Use the payment request ID
-                "reference": request_data["offline_reference"]  # Use the offline reference
+                "id": request_data["id"],
+                "reference": request_data["offline_reference"]
             }
         }
         
