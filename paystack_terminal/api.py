@@ -3,10 +3,11 @@ import requests
 import json
 from frappe import _
 
+
 @frappe.whitelist()
-def process_payment(amount, reference, patient=None, invoice=None):
+def process_payment(amount, reference, invoice=None):
     """Process payment from Paystack Terminal"""
-    try:  # Add try-catch for better error handling
+    try:
         settings = frappe.get_single("Paystack Settings")
         
         if not settings.enabled:
@@ -17,37 +18,41 @@ def process_payment(amount, reference, patient=None, invoice=None):
             "Content-Type": "application/json"
         }
         
-        # Convert amount to kobo 
+        # Convert amount to kobo
         amount_in_kobo = int(float(amount) * 100)
         
-        # Create payment request first
+        # Get customer email from Sales Invoice's Customer
+        customer_email = None
+        if invoice:
+            sales_invoice = frappe.get_doc('Sales Invoice', invoice)
+            customer_email = frappe.db.get_value('Customer', sales_invoice.customer, 'email_id')
+        
+        # Create payment request
         payment_data = {
-            "customer": patient if patient else "WALK_IN_CUSTOMER",
+            "email": customer_email or "customer@example.com",
             "description": f"Payment for Invoice {invoice}" if invoice else "Direct Payment",
             "line_items": [
                 {
                     "name": "Invoice Payment",
-                    "amount": str(amount_in_kobo),  # Use converted amount
+                    "amount": str(amount_in_kobo),
                     "quantity": 1
                 }
             ]
         }
         
-        # Add debug logging
+        # Debug logging
         frappe.logger().debug(f"Paystack Request Data: {payment_data}")
         
         create_request_url = "https://api.paystack.co/paymentrequest"
         request_response = requests.post(create_request_url, headers=headers, json=payment_data)
         
-        # Log response for debugging
-        frappe.logger().debug(f"Paystack Response: {request_response.text}")
-        
         if request_response.status_code != 200:
+            frappe.logger().error(f"Paystack Error: {request_response.text}")
             frappe.throw(_(f"Failed to create payment request: {request_response.text}"))
             
         request_data = request_response.json()["data"]
         
-        
+        # Push to terminal
         terminal_data = {
             "type": "invoice",
             "action": "process",
@@ -72,6 +77,7 @@ def process_payment(amount, reference, patient=None, invoice=None):
     except Exception as e:
         frappe.logger().error(f"Paystack Process Error: {str(e)}")
         frappe.throw(_("Failed to create payment request"))
+
         
 def get_or_create_customer(payment_data, patient=None):
     """Get existing customer or create new one from payment data"""
