@@ -12,71 +12,53 @@ def process_payment(amount, reference, invoice=None, patient=None):
         if not settings.enabled:
             frappe.throw(_("Paystack Terminal integration is disabled"))
             
+        # Check terminal status before proceeding
+        settings.check_terminal_status()
+        if settings.terminal_status != "Connected":
+            frappe.throw(_("Terminal is not connected or busy. Status: {0}").format(settings.terminal_status))
+            
         headers = {
             "Authorization": f"Bearer {settings.get_password('secret_key')}",
             "Content-Type": "application/json"
         }
         
-        # Convert amount to kobo
+        # Convert amount to kobo for Paystack
         amount_in_kobo = int(float(amount) * 100)
         
-        # Get customer email from Sales Invoice
-        customer_email = None
-        if invoice:
-            sales_invoice = frappe.get_doc('Sales Invoice', invoice)
-            customer_email = frappe.db.get_value('Customer', sales_invoice.customer, 'email_id')
-        
-        # Create payment request
-        payment_data = {
-            "amount": amount_in_kobo,  # Total amount in kobo
-            "email": customer_email or "customer@example.com",
-            "metadata": {
-                "invoice_id": invoice,
-                "reference": reference,
-                "patient": patient
-            }
-        }
-        
-        frappe.logger().debug(f"Paystack Request Data: {payment_data}")
-        
-        create_request_url = "https://api.paystack.co/transaction/initialize"
-        request_response = requests.post(create_request_url, headers=headers, json=payment_data)
-        
-        if request_response.status_code != 200:
-            frappe.logger().error(f"Paystack Error: {request_response.text}")
-            frappe.throw(_(f"Failed to create payment request: {request_response.text}"))
-            
-        response_data = request_response.json()["data"]
-        
-        # Push to terminal
+        # Direct terminal payment request
         terminal_data = {
-            "type": "process",
-            "action": "process_payment",
+            "type": "pos_payment",
+            "action": "process",
             "data": {
                 "amount": amount_in_kobo,
-                "reference": response_data["reference"],
-                "email": customer_email or "customer@example.com"
+                "description": f"Payment for Invoice {invoice}" if invoice else "Direct Payment",
+                "metadata": {
+                    "invoice_id": invoice,
+                    "reference": reference,
+                    "patient": patient
+                }
             }
         }
         
-        # Log terminal request
+        # Send to physical POS terminal
         terminal_url = f"https://api.paystack.co/terminal/{settings.terminal_id}/event"
-        frappe.logger().debug(f"Terminal Request URL: {terminal_url}")
-        frappe.logger().debug(f"Terminal Request Data: {terminal_data}")
+        
+        # Log what we're sending to terminal
+        frappe.logger().debug(f"Terminal Request: {terminal_data}")
         
         terminal_response = requests.post(terminal_url, headers=headers, json=terminal_data)
         
         # Log terminal response
-        frappe.logger().debug(f"Terminal Response Status: {terminal_response.status_code}")
         frappe.logger().debug(f"Terminal Response: {terminal_response.text}")
         
         if terminal_response.status_code != 200:
-            frappe.logger().error(f"Terminal Error: {terminal_response.text}")
-            frappe.throw(_("Failed to push payment to terminal. Error: {0}").format(terminal_response.text))
+            frappe.throw(_(f"Failed to push payment to terminal: {terminal_response.text}"))
+            
+        response_data = terminal_response.json()["data"]
             
         return {
             "status": "pending",
-            "reference": response_data["reference"]
+            "reference": response_data.get("reference") or reference
         }
         
     except Exception as e:
