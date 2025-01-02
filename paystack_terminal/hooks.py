@@ -19,13 +19,9 @@ modules = {
     }
 }
 
-# Includes in <head>
-# ------------------
-
 # include js, css files in header of desk.html
 app_include_js = [
-    "/assets/paystack_terminal/js/paystack_terminal.js",
-    "/assets/paystack_terminal/js/sales_invoice.js"
+    "/assets/paystack_terminal/js/paystack_terminal.js"
 ]
 
 # Doc Events
@@ -42,7 +38,8 @@ fixtures = [
         "filters": [
             ["name", "in", [
                 "Payment Entry-paystack_reference",
-                "Sales Invoice-terminal_reference"
+                "Sales Invoice-terminal_reference",
+                "Sales Invoice-paystack_status"
             ]]
         ]
     },
@@ -59,4 +56,21 @@ fixtures = [
 # DocType JS
 doctype_js = {
     "Sales Invoice": "public/js/sales_invoice.js"
+}
+
+# Webhooks
+webhooks = [
+    {
+        "webhook": "Paystack Terminal Webhook",
+        "url": "/api/method/paystack_terminal.api.handle_webhook",
+        "request_method": "POST",
+        "secret": None  # Will be set from Paystack Settings
+    }
+]
+
+# Schedule Tasks for reconciliation
+scheduler_events = {
+    "daily": [
+        "paystack_terminal.api.reconcile_pending_payments"
+    ]
 }

@@ -4,8 +4,8 @@ import json
 from frappe import _
 
 @frappe.whitelist()
-def process_payment(amount, reference, invoice=None, patient=None):
-    """Process payment from Paystack Terminal"""
+def verify_payment(amount, reference, invoice):
+    """Verify and link Paystack terminal payment"""
     try:
         settings = frappe.get_single("Paystack Settings")
         
@@ -17,124 +17,129 @@ def process_payment(amount, reference, invoice=None, patient=None):
             "Content-Type": "application/json"
         }
         
-        # Get customer email from Sales Invoice
-        customer_email = None
-        customer_name = None
-        if invoice:
-            sales_invoice = frappe.get_doc('Sales Invoice', invoice)
-            customer_email = frappe.db.get_value('Customer', sales_invoice.customer, 'email_id')
-            customer_name = sales_invoice.customer_name
+        # Get invoice and customer details
+        sales_invoice = frappe.get_doc("Sales Invoice", invoice)
+        customer = frappe.get_doc("Customer", sales_invoice.customer)
         
-        # Convert amount to kobo for Paystack (amount comes as string)
-        amount_in_kobo = int(float(amount))  # Already in kobo from frontend
-        
-        # First create a payment request
-        payment_data = {
-            "amount": amount_in_kobo,
-            "description": f"Payment for Invoice {invoice}",
-            "line_items": [{
-                "name": "Invoice Payment",
-                "amount": str(amount_in_kobo),
-                "quantity": 1
-            }],
-            "customer": {
-                "email": customer_email or "customer@example.com",
-                "name": customer_name or patient or "Customer"
-            }
+        # Prepare metadata
+        metadata = {
+            "invoice_no": invoice,
+            "customer_name": customer.customer_name,
+            "customer_email": customer.email_id or "customer@example.com",
+            "patient": sales_invoice.patient if hasattr(sales_invoice, 'patient') else None,
+            "company": sales_invoice.company,
+            "source": "ERPNext Healthcare"
         }
         
-        # Log the payment request data
-        frappe.logger().debug(f"Payment Request Data: {payment_data}")
+        # Update transaction with metadata
+        update_url = f"https://api.paystack.co/transaction/{reference}"
+        update_data = {"metadata": metadata}
         
-        # Create payment request
-        create_request_url = "https://api.paystack.co/paymentrequest"
-        request_response = requests.post(create_request_url, headers=headers, json=payment_data)
+        requests.put(update_url, headers=headers, json=update_data)
         
-        # Log the complete response
-        frappe.logger().debug(f"Payment Request Response: {request_response.text}")
+        # Verify transaction with Paystack
+        verify_url = f"https://api.paystack.co/transaction/verify/{reference}"
+        verify_response = requests.get(verify_url, headers=headers)
         
-        if request_response.status_code != 200:
-            frappe.logger().error(f"Payment Request Error: {request_response.text}")
-            frappe.throw(_(f"Failed to create payment request: {request_response.text}"))
+        if verify_response.status_code != 200:
+            frappe.throw(_("Could not verify payment"))
             
-        request_data = request_response.json()["data"]
+        response_data = verify_response.json()["data"]
         
-        # Now push to terminal with the received id and reference
-        terminal_data = {
-            "type": "invoice",
-            "action": "process",
-            "data": {
-                "id": request_data["id"],
-                "reference": request_data["offline_reference"]
-            }
-        }
-        
-        # Send to physical POS terminal
-        terminal_url = f"https://api.paystack.co/terminal/{settings.terminal_id}/event"
-        
-        # Log what we're sending to terminal
-        frappe.logger().debug(f"Terminal Request: {terminal_data}")
-        
-        terminal_response = requests.post(terminal_url, headers=headers, json=terminal_data)
-        
-        # Log terminal response
-        frappe.logger().debug(f"Terminal Response: {terminal_response.text}")
-        
-        if terminal_response.status_code != 200:
-            frappe.throw(_(f"Failed to push payment to terminal: {terminal_response.text}"))
+        if response_data["status"] != "success":
+            frappe.throw(_("Payment was not successful"))
             
-        return {
-            "status": "pending",
-            "reference": request_data["offline_reference"]
-        }
+        return create_payment_entry(reference, amount, invoice, metadata)
         
     except Exception as e:
-        frappe.logger().error(f"Paystack Process Error: {str(e)}")
-        frappe.throw(_("Failed to create payment request"))
-
+        frappe.logger().error(f"Paystack Payment Verification Error: {str(e)}")
+        frappe.throw(_("Failed to verify payment"))
 
 @frappe.whitelist(allow_guest=True)
 def handle_webhook():
     """Handle Paystack webhook notifications"""
     if frappe.request.data:
-        data = json.loads(frappe.request.data)
-        
-        if data.get("event") == "charge.success":
-            handle_successful_charge(data["data"])
-        elif data.get("event") == "paymentrequest.success":
-            handle_successful_payment_request(data["data"])
+        try:
+            data = json.loads(frappe.request.data)
             
+            # Log webhook data for debugging
+            frappe.logger().debug(f"Paystack Webhook Data: {data}")
+            
+            if data.get("event") == "charge.success":
+                handle_successful_charge(data["data"])
+            elif data.get("event") == "paymentrequest.success":
+                handle_successful_payment_request(data["data"])
+                
+            return {"status": "success"}
+            
+        except Exception as e:
+            frappe.logger().error(f"Webhook Processing Error: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
 def handle_successful_charge(data):
     """Handle successful charge notification"""
-    reference = data.get("reference")
-    amount = float(data.get("amount", 0)) / 100  # Convert from kobo to naira
-    
-    create_payment_entry(reference, amount)
+    try:
+        reference = data.get("reference")
+        amount = float(data.get("amount", 0)) / 100  # Convert from kobo to naira
+        metadata = data.get("metadata", {})
+        
+        # Check if payment entry already exists
+        if not frappe.db.exists("Payment Entry", {"reference_no": reference}):
+            create_payment_entry(reference, amount, metadata.get("invoice_no"), metadata)
+            
+    except Exception as e:
+        frappe.logger().error(f"Charge Processing Error: {str(e)}")
 
 def handle_successful_payment_request(data):
     """Handle successful payment request notification"""
-    reference = data.get("offline_reference")
-    amount = float(data.get("amount", 0)) / 100  # Convert from kobo to naira
-    
-    # Create payment entry
-    create_payment_entry(reference, amount)
+    try:
+        reference = data.get("offline_reference")
+        amount = float(data.get("amount", 0)) / 100  # Convert from kobo to naira
+        metadata = data.get("metadata", {})
+        
+        # Check if payment entry already exists
+        if not frappe.db.exists("Payment Entry", {"reference_no": reference}):
+            create_payment_entry(reference, amount, metadata.get("invoice_no"), metadata)
+            
+    except Exception as e:
+        frappe.logger().error(f"Payment Request Processing Error: {str(e)}")
 
-def create_payment_entry(reference, amount):
+def create_payment_entry(reference, amount, invoice=None, metadata=None):
     """Create a Payment Entry for successful Paystack payments"""
-    payment = frappe.get_doc({
-        "doctype": "Payment Entry",
-        "payment_type": "Receive",
-        "posting_date": frappe.utils.today(),
-        "company": frappe.defaults.get_user_default("Company"),
-        "mode_of_payment": "Paystack Terminal",
-        "paid_amount": amount,
-        "received_amount": amount,
-        "reference_no": reference,
-        "reference_date": frappe.utils.today(),
-        "party_type": "Customer",
-        "party": "Walk-in Customer"  # You might want to update this based on your needs
-    })
-    
-    payment.insert(ignore_permissions=True)
-    payment.submit()
-    return payment
+    try:
+        payment_entry = frappe.get_doc({
+            "doctype": "Payment Entry",
+            "payment_type": "Receive",
+            "posting_date": frappe.utils.today(),
+            "company": metadata.get("company") if metadata else frappe.defaults.get_user_default("Company"),
+            "mode_of_payment": "Paystack Terminal",
+            "paid_amount": amount,
+            "received_amount": amount,
+            "reference_no": reference,
+            "reference_date": frappe.utils.today(),
+            "party_type": "Customer",
+            "remarks": f"Patient: {metadata.get('patient')}" if metadata and metadata.get('patient') else None
+        })
+        
+        # If invoice is provided, link it
+        if invoice:
+            payment_entry.party = frappe.get_value("Sales Invoice", invoice, "customer")
+            payment_entry.append("references", {
+                "reference_doctype": "Sales Invoice",
+                "reference_name": invoice,
+                "allocated_amount": amount
+            })
+        else:
+            payment_entry.party = "Walk-in Customer"
+        
+        payment_entry.insert(ignore_permissions=True)
+        payment_entry.submit()
+        
+        return {
+            "success": True,
+            "payment_entry": payment_entry.name
+        }
+        
+    except Exception as e:
+        frappe.logger().error(f"Payment Entry Creation Error: {str(e)}")
+        frappe.throw(_("Failed to create payment entry"))
