@@ -50,18 +50,29 @@ def process_payment(amount, reference, invoice=None, patient=None):
         
         # Push to terminal
         terminal_data = {
-            "type": "transaction",
-            "action": "process",
+            "type": "process",
+            "action": "process_payment",
             "data": {
-                "reference": response_data["reference"]
+                "amount": amount_in_kobo,
+                "reference": response_data["reference"],
+                "email": customer_email or "customer@example.com"
             }
         }
         
+        # Log terminal request
         terminal_url = f"https://api.paystack.co/terminal/{settings.terminal_id}/event"
+        frappe.logger().debug(f"Terminal Request URL: {terminal_url}")
+        frappe.logger().debug(f"Terminal Request Data: {terminal_data}")
+        
         terminal_response = requests.post(terminal_url, headers=headers, json=terminal_data)
         
+        # Log terminal response
+        frappe.logger().debug(f"Terminal Response Status: {terminal_response.status_code}")
+        frappe.logger().debug(f"Terminal Response: {terminal_response.text}")
+        
         if terminal_response.status_code != 200:
-            frappe.throw(_("Failed to push payment to terminal"))
+            frappe.logger().error(f"Terminal Error: {terminal_response.text}")
+            frappe.throw(_("Failed to push payment to terminal. Error: {0}").format(terminal_response.text))
             
         return {
             "status": "pending",
