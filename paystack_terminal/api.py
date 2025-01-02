@@ -20,19 +20,34 @@ def process_payment(amount, reference, invoice=None, patient=None):
         # Convert amount to kobo for Paystack
         amount_in_kobo = int(float(amount) * 100)
         
-        # Direct terminal payment request
+        # First create a payment request
+        payment_data = {
+            "amount": amount_in_kobo,
+            "email": "customer@example.com",  # Default email
+            "metadata": {
+                "invoice_id": invoice,
+                "reference": reference,
+                "patient": patient
+            }
+        }
+        
+        # Create payment request
+        create_request_url = "https://api.paystack.co/paymentrequest"
+        request_response = requests.post(create_request_url, headers=headers, json=payment_data)
+        
+        if request_response.status_code != 200:
+            frappe.logger().error(f"Payment Request Error: {request_response.text}")
+            frappe.throw(_(f"Failed to create payment request: {request_response.text}"))
+            
+        request_data = request_response.json()["data"]
+        
+        # Now push to terminal with the received id and reference
         terminal_data = {
-            "type": "invoice",  # Changed from pos_payment to invoice
+            "type": "invoice",
             "action": "process",
             "data": {
-                "id": reference,  # Use reference as ID
-                "reference": reference,
-                "amount": amount_in_kobo,
-                "description": f"Payment for Invoice {invoice}" if invoice else "Direct Payment",
-                "metadata": {
-                    "invoice_id": invoice,
-                    "patient": patient
-                }
+                "id": request_data["id"],  # Use the payment request ID
+                "reference": request_data["offline_reference"]  # Use the offline reference
             }
         }
         
@@ -50,16 +65,15 @@ def process_payment(amount, reference, invoice=None, patient=None):
         if terminal_response.status_code != 200:
             frappe.throw(_(f"Failed to push payment to terminal: {terminal_response.text}"))
             
-        response_data = terminal_response.json()["data"]
-            
         return {
             "status": "pending",
-            "reference": response_data.get("reference") or reference
+            "reference": request_data["offline_reference"]
         }
         
     except Exception as e:
         frappe.logger().error(f"Paystack Process Error: {str(e)}")
         frappe.throw(_("Failed to create payment request"))
+
 
 @frappe.whitelist(allow_guest=True)
 def handle_webhook():
