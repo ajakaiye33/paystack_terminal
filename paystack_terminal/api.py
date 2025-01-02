@@ -12,11 +12,6 @@ def process_payment(amount, reference, invoice=None, patient=None):
         if not settings.enabled:
             frappe.throw(_("Paystack Terminal integration is disabled"))
             
-        # Check terminal status before proceeding
-        settings.check_terminal_status()
-        if settings.terminal_status != "Connected":
-            frappe.throw(_("Terminal is not connected or busy. Status: {0}").format(settings.terminal_status))
-            
         headers = {
             "Authorization": f"Bearer {settings.get_password('secret_key')}",
             "Content-Type": "application/json"
@@ -27,14 +22,15 @@ def process_payment(amount, reference, invoice=None, patient=None):
         
         # Direct terminal payment request
         terminal_data = {
-            "type": "pos_payment",
+            "type": "invoice",  # Changed from pos_payment to invoice
             "action": "process",
             "data": {
+                "id": reference,  # Use reference as ID
+                "reference": reference,
                 "amount": amount_in_kobo,
                 "description": f"Payment for Invoice {invoice}" if invoice else "Direct Payment",
                 "metadata": {
                     "invoice_id": invoice,
-                    "reference": reference,
                     "patient": patient
                 }
             }
