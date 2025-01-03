@@ -259,3 +259,36 @@ def reconcile_pending_payments():
                 
     except Exception as e:
         frappe.logger().error(f"Reconciliation Error: {str(e)}")
+
+
+def update_payment_status(doc, method):
+    """Update payment status in Sales Invoice when Payment Entry is submitted"""
+    try:
+        # Only process if it's a Paystack Terminal payment
+        if doc.mode_of_payment != "Paystack Terminal":
+            return
+            
+        # Get linked Sales Invoice
+        for ref in doc.references:
+            if ref.reference_doctype == "Sales Invoice":
+                sales_invoice = frappe.get_doc("Sales Invoice", ref.reference_name)
+                
+                # Update custom field
+                sales_invoice.db_set("paystack_status", "Paid")
+                sales_invoice.db_set("terminal_reference", doc.reference_no)
+                
+                # Add comment to Sales Invoice
+                frappe.get_doc({
+                    "doctype": "Comment",
+                    "comment_type": "Info",
+                    "reference_doctype": "Sales Invoice",
+                    "reference_name": sales_invoice.name,
+                    "content": f"Payment processed via Paystack Terminal (Reference: {doc.reference_no})"
+                }).insert(ignore_permissions=True)
+                
+                frappe.db.commit()
+                
+    except Exception as e:
+        frappe.logger().error(f"Payment Status Update Error: {str(e)}")
+        # Don't throw error to avoid interrupting payment entry submission
+        pass
