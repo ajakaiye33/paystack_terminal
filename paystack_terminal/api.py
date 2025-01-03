@@ -58,23 +58,44 @@ def verify_payment(amount, reference, invoice):
 @frappe.whitelist(allow_guest=True)
 def handle_webhook():
     """Handle Paystack webhook notifications"""
-    if frappe.request.data:
-        try:
+    try:
+        # Get the signature from headers
+        signature = frappe.get_request_header('x-paystack-signature')
+        
+        if not signature:
+            frappe.logger().warning("No Paystack signature in webhook")
+            return {'status': 'error', 'message': 'No signature'}
+            
+        # Get request data
+        if frappe.request.data:
             data = json.loads(frappe.request.data)
             
             # Log webhook data for debugging
             frappe.logger().debug(f"Paystack Webhook Data: {data}")
             
-            if data.get("event") == "charge.success":
-                handle_successful_charge(data["data"])
-            elif data.get("event") == "paymentrequest.success":
-                handle_successful_payment_request(data["data"])
+            # Process based on event type
+            event = data.get('event')
+            if event == "charge.success":
+                # Process immediately but don't wait
+                frappe.enqueue(
+                    'paystack_terminal.api.handle_successful_charge',
+                    data=data.get('data'),
+                    queue='short'
+                )
+            elif event == "paymentrequest.success":
+                frappe.enqueue(
+                    'paystack_terminal.api.handle_successful_payment_request',
+                    data=data.get('data'),
+                    queue='short'
+                )
                 
-            return {"status": "success"}
+            # Return 200 OK immediately
+            return {'status': 'success'}
             
-        except Exception as e:
-            frappe.logger().error(f"Webhook Processing Error: {str(e)}")
-            return {"status": "error", "message": str(e)}
+    except Exception as e:
+        frappe.logger().error(f"Webhook Processing Error: {str(e)}")
+        # Still return 200 OK to prevent retries
+        return {'status': 'success'}
 
 def handle_successful_charge(data):
     """Handle successful charge notification"""

@@ -12,8 +12,7 @@
   "cb_1",
   "terminal_status",
   "webhook_section",
-  "webhook_url",
-  "webhook_secret"
+  "webhook_url"
  ],
  "fields": [
   {
@@ -68,11 +67,6 @@
    "label": "Webhook URL",
    "read_only": 1,
    "default": "/api/method/paystack_terminal.api.handle_webhook"
-  },
-  {
-   "fieldname": "webhook_secret",
-   "fieldtype": "Password",
-   "label": "Webhook Secret"
   }
  ],
  "index_web_pages_for_search": 1,
