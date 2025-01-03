@@ -64,7 +64,7 @@ webhooks = [
         "webhook": "Paystack Terminal Webhook",
         "url": "/api/method/paystack_terminal.api.handle_webhook",
         "request_method": "POST",
-        "secret": None  # Will be set from Paystack Settings
+        "secret": None  # Will be pulled from settings
     }
 ]
 

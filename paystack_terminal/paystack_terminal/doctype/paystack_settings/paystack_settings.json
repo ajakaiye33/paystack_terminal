@@ -10,7 +10,10 @@
   "public_key",
   "terminal_id",
   "cb_1",
-  "terminal_status"
+  "terminal_status",
+  "webhook_section",
+  "webhook_url",
+  "webhook_secret"
  ],
  "fields": [
   {
@@ -52,6 +55,24 @@
    "fieldtype": "Read Only",
    "label": "Terminal Status",
    "read_only": 1
+  },
+  {
+   "fieldname": "webhook_section",
+   "fieldtype": "Section Break",
+   "label": "Webhook Settings",
+   "depends_on": "enabled"
+  },
+  {
+   "fieldname": "webhook_url",
+   "fieldtype": "Data",
+   "label": "Webhook URL",
+   "read_only": 1,
+   "default": "/api/method/paystack_terminal.api.handle_webhook"
+  },
+  {
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret"
   }
  ],
  "index_web_pages_for_search": 1,

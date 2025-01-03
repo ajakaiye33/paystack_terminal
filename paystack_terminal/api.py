@@ -143,3 +143,57 @@ def create_payment_entry(reference, amount, invoice=None, metadata=None):
     except Exception as e:
         frappe.logger().error(f"Payment Entry Creation Error: {str(e)}")
         frappe.throw(_("Failed to create payment entry"))
+
+def reconcile_pending_payments():
+    """Daily reconciliation of pending payments"""
+    try:
+        settings = frappe.get_single("Paystack Settings")
+        
+        if not settings.enabled:
+            return
+            
+        headers = {
+            "Authorization": f"Bearer {settings.get_password('secret_key')}",
+            "Content-Type": "application/json"
+        }
+        
+        # Get pending payments from the last 24 hours
+        yesterday = frappe.utils.add_days(frappe.utils.nowdate(), -1)
+        
+        # Get all Sales Invoices with terminal_reference but no payment entry
+        pending_invoices = frappe.get_all(
+            "Sales Invoice",
+            filters={
+                "terminal_reference": ["!=", ""],
+                "status": "Unpaid",
+                "creation": [">=", yesterday]
+            },
+            fields=["name", "terminal_reference", "grand_total"]
+        )
+        
+        for invoice in pending_invoices:
+            try:
+                # Verify payment status with Paystack
+                verify_url = f"https://api.paystack.co/transaction/verify/{invoice.terminal_reference}"
+                verify_response = requests.get(verify_url, headers=headers)
+                
+                if verify_response.status_code == 200:
+                    response_data = verify_response.json()["data"]
+                    
+                    if response_data["status"] == "success":
+                        # Create payment entry if payment was successful
+                        if not frappe.db.exists("Payment Entry", {"reference_no": invoice.terminal_reference}):
+                            create_payment_entry(
+                                reference=invoice.terminal_reference,
+                                amount=invoice.grand_total,
+                                invoice=invoice.name
+                            )
+                            
+                        frappe.logger().info(f"Reconciled payment for invoice {invoice.name}")
+                        
+            except Exception as e:
+                frappe.logger().error(f"Error reconciling invoice {invoice.name}: {str(e)}")
+                continue
+                
+    except Exception as e:
+        frappe.logger().error(f"Reconciliation Error: {str(e)}")
