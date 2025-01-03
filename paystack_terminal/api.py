@@ -7,6 +7,9 @@ from frappe import _
 def verify_payment(amount, reference, invoice):
     """Verify and link Paystack terminal payment"""
     try:
+        # Convert amount to float
+        amount = float(amount)
+        
         settings = frappe.get_single("Paystack Settings")
         
         if not settings.enabled:
@@ -51,6 +54,8 @@ def verify_payment(amount, reference, invoice):
             
         return create_payment_entry(reference, amount, invoice, metadata)
         
+    except ValueError:
+        frappe.throw(_("Invalid amount format"))
     except Exception as e:
         frappe.logger().error(f"Paystack Payment Verification Error: {str(e)}")
         frappe.throw(_("Failed to verify payment"))
@@ -132,6 +137,9 @@ def handle_successful_payment_request(data):
 def create_payment_entry(reference, amount, invoice=None, metadata=None):
     """Create a Payment Entry for successful Paystack payments"""
     try:
+        # Ensure amount is float
+        amount = float(amount) if isinstance(amount, str) else amount
+        
         # Ensure Mode of Payment exists
         if not frappe.db.exists("Mode of Payment", "Paystack Terminal"):
             frappe.get_doc({
@@ -153,7 +161,7 @@ def create_payment_entry(reference, amount, invoice=None, metadata=None):
             "mode_of_payment": "Paystack Terminal",
             "paid_amount": amount,
             "received_amount": amount,
-            "target_exchange_rate": 1,  # Set exchange rate to 1 for same currency
+            "target_exchange_rate": 1,
             "paid_to_account_currency": company_currency,
             "paid_from_account_currency": company_currency,
             "reference_no": reference,
