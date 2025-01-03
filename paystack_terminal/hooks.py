@@ -49,7 +49,13 @@ fixtures = [
     },
     {
         "dt": "Mode of Payment",
-        "filters": [["name", "=", "Paystack Terminal"]]
+        "filters": [["name", "=", "Paystack Terminal"]],
+        "records": [{
+            "doctype": "Mode of Payment",
+            "mode_of_payment": "Paystack Terminal",
+            "type": "Bank",
+            "enabled": 1
+        }]
     }
 ]
 

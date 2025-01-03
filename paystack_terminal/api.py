@@ -100,6 +100,10 @@ def handle_webhook():
 def handle_successful_charge(data):
     """Handle successful charge notification"""
     try:
+        if not isinstance(data, dict):
+            frappe.logger().error(f"Invalid data type received: {type(data)}")
+            return
+            
         reference = data.get("reference")
         amount = float(data.get("amount", 0)) / 100  # Convert from kobo to naira
         metadata = data.get("metadata", {})
@@ -128,6 +132,15 @@ def handle_successful_payment_request(data):
 def create_payment_entry(reference, amount, invoice=None, metadata=None):
     """Create a Payment Entry for successful Paystack payments"""
     try:
+        # Ensure Mode of Payment exists
+        if not frappe.db.exists("Mode of Payment", "Paystack Terminal"):
+            frappe.get_doc({
+                "doctype": "Mode of Payment",
+                "mode_of_payment": "Paystack Terminal",
+                "type": "Bank",
+                "enabled": 1
+            }).insert(ignore_permissions=True)
+        
         payment_entry = frappe.get_doc({
             "doctype": "Payment Entry",
             "payment_type": "Receive",
@@ -164,6 +177,7 @@ def create_payment_entry(reference, amount, invoice=None, metadata=None):
     except Exception as e:
         frappe.logger().error(f"Payment Entry Creation Error: {str(e)}")
         frappe.throw(_("Failed to create payment entry"))
+
 
 def reconcile_pending_payments():
     """Daily reconciliation of pending payments"""
