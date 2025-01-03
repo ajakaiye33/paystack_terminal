@@ -141,14 +141,21 @@ def create_payment_entry(reference, amount, invoice=None, metadata=None):
                 "enabled": 1
             }).insert(ignore_permissions=True)
         
+        # Get company currency
+        company = metadata.get("company") if metadata else frappe.defaults.get_user_default("Company")
+        company_currency = frappe.get_value("Company", company, "default_currency")
+        
         payment_entry = frappe.get_doc({
             "doctype": "Payment Entry",
             "payment_type": "Receive",
             "posting_date": frappe.utils.today(),
-            "company": metadata.get("company") if metadata else frappe.defaults.get_user_default("Company"),
+            "company": company,
             "mode_of_payment": "Paystack Terminal",
             "paid_amount": amount,
             "received_amount": amount,
+            "target_exchange_rate": 1,  # Set exchange rate to 1 for same currency
+            "paid_to_account_currency": company_currency,
+            "paid_from_account_currency": company_currency,
             "reference_no": reference,
             "reference_date": frappe.utils.today(),
             "party_type": "Customer",
@@ -165,6 +172,18 @@ def create_payment_entry(reference, amount, invoice=None, metadata=None):
             })
         else:
             payment_entry.party = "Walk-in Customer"
+        
+        # Set accounts
+        payment_entry.paid_to = frappe.get_value("Mode of Payment Account",
+            {"parent": "Paystack Terminal", "company": company}, "default_account")
+            
+        if not payment_entry.paid_to:
+            payment_entry.paid_to = frappe.get_value("Company", company, "default_bank_account")
+            
+        if not payment_entry.paid_to:
+            frappe.throw(_("Please set default bank account in Company or Mode of Payment"))
+            
+        payment_entry.paid_from = frappe.get_value("Company", company, "default_receivable_account")
         
         payment_entry.insert(ignore_permissions=True)
         payment_entry.submit()
