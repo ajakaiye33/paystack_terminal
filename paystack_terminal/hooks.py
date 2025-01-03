@@ -37,6 +37,7 @@ fixtures = [
         "dt": "Custom Field",
         "filters": [
             ["name", "in", [
+                "Customer-paystack_customer_code",
                 "Payment Entry-paystack_reference",
                 "Sales Invoice-terminal_reference",
                 "Sales Invoice-paystack_status"

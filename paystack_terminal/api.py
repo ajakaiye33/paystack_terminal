@@ -24,19 +24,56 @@ def verify_payment(amount, reference, invoice):
         sales_invoice = frappe.get_doc("Sales Invoice", invoice)
         customer = frappe.get_doc("Customer", sales_invoice.customer)
         
+        # Create/Update customer in Paystack
+        name_parts = customer.customer_name.split(' ', 1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+        
+        customer_data = {
+            "email": customer.email_id or f"customer_{customer.name.lower()}@example.com",
+            "first_name": first_name,
+            "last_name": last_name,
+            "phone": customer.mobile_no,
+            "metadata": {
+                "erp_customer_id": customer.name,
+                "patient": sales_invoice.patient if hasattr(sales_invoice, 'patient') else None
+            }
+        }
+        
+        # Check if customer exists in Paystack
+        if not customer.get("paystack_customer_code"):
+            # Create new customer
+            customer_response = requests.post(
+                "https://api.paystack.co/customer",
+                headers=headers,
+                json=customer_data
+            )
+            
+            if customer_response.status_code == 200:
+                customer_result = customer_response.json()
+                if customer_result.get("status"):
+                    customer.db_set(
+                        "paystack_customer_code",
+                        customer_result["data"]["customer_code"],
+                        update_modified=False
+                    )
+        
         # Prepare metadata
         metadata = {
             "invoice_no": invoice,
             "customer_name": customer.customer_name,
-            "customer_email": customer.email_id or "customer@example.com",
+            "customer_email": customer.email_id,
             "patient": sales_invoice.patient if hasattr(sales_invoice, 'patient') else None,
             "company": sales_invoice.company,
             "source": "ERPNext Healthcare"
         }
         
-        # Update transaction with metadata
+        # Update transaction with metadata and customer
         update_url = f"https://api.paystack.co/transaction/{reference}"
-        update_data = {"metadata": metadata}
+        update_data = {
+            "metadata": metadata,
+            "customer": customer.get("paystack_customer_code")
+        }
         
         requests.put(update_url, headers=headers, json=update_data)
         
@@ -54,8 +91,6 @@ def verify_payment(amount, reference, invoice):
             
         return create_payment_entry(reference, amount, invoice, metadata)
         
-    except ValueError:
-        frappe.throw(_("Invalid amount format"))
     except Exception as e:
         frappe.logger().error(f"Paystack Payment Verification Error: {str(e)}")
         frappe.throw(_("Failed to verify payment"))
