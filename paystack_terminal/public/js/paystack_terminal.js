@@ -1,11 +1,11 @@
 frappe.provide('paystack_terminal');
 
-paystack_terminal.verify_payment = function(args, callback) {
+paystack_terminal.process_payment = function(args, callback) {
     frappe.call({
-        method: 'paystack_terminal.api.verify_payment',
+        method: 'paystack_terminal.api.process_terminal_payment',
         args: args,
         freeze: true,
-        freeze_message: __('Verifying payment...'),
+        freeze_message: __('Processing payment on terminal...'),
         callback: function(r) {
             if (r.message && r.message.success) {
                 if (callback) callback(r.message);
@@ -13,8 +13,8 @@ paystack_terminal.verify_payment = function(args, callback) {
         },
         error: function(r) {
             frappe.msgprint({
-                title: __('Verification Failed'),
-                message: __('Could not verify payment. Please check the reference number and try again.'),
+                title: __('Payment Failed'),
+                message: __('Could not process payment. Please try again.'),
                 indicator: 'red'
             });
         }
