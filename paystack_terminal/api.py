@@ -57,7 +57,7 @@ def verify_payment(amount, reference, invoice):
                     paystack_customer_code = customer_result["data"]["customer_code"]
                     customer.db_set(
                         "paystack_customer_code",
-                        paystack_customer_code,
+                        customer_result["data"]["customer_code"],
                         update_modified=False
                     )
             else:
@@ -78,7 +78,7 @@ def verify_payment(amount, reference, invoice):
         update_url = f"https://api.paystack.co/transaction/{reference}"
         update_data = {
             "metadata": metadata,
-            "customer": paystack_customer_code
+            "customer": customer.get("paystack_customer_code")
         }
         
         update_response = requests.put(update_url, headers=headers, json=update_data)
