@@ -252,11 +252,23 @@ def process_terminal_payment(invoice, amount, customer):
         if not settings.enabled:
             frappe.throw(_("Paystack Terminal integration is disabled"))
             
+        # Check terminal status before proceeding
         headers = {
             "Authorization": f"Bearer {settings.get_password('secret_key')}",
             "Content-Type": "application/json"
         }
         
+        # Check if terminal is online and available
+        terminal_url = f"https://api.paystack.co/terminal/{settings.terminal_id}/presence"
+        terminal_response = requests.get(terminal_url, headers=headers)
+        
+        if terminal_response.status_code != 200:
+            frappe.throw(_("Could not check terminal status"))
+            
+        terminal_data = terminal_response.json().get("data", {})
+        if not (terminal_data.get("online") and terminal_data.get("available")):
+            frappe.throw(_("Terminal is not available for payment processing"))
+            
         # Get invoice, customer, and patient details
         sales_invoice = frappe.get_doc("Sales Invoice", invoice)
         customer = frappe.get_doc("Customer", sales_invoice.customer)
