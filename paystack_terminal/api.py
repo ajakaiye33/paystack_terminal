@@ -20,23 +20,24 @@ def verify_payment(amount, reference, invoice):
             "Content-Type": "application/json"
         }
         
-        # Get invoice and customer details
+        # Get invoice, customer and patient details
         sales_invoice = frappe.get_doc("Sales Invoice", invoice)
         customer = frappe.get_doc("Customer", sales_invoice.customer)
         
-        # Create/Update customer in Paystack
-        name_parts = customer.customer_name.split(' ', 1)
-        first_name = name_parts[0]
-        last_name = name_parts[1] if len(name_parts) > 1 else ""
+        # Get patient details if available
+        patient = None
+        if hasattr(sales_invoice, 'patient') and sales_invoice.patient:
+            patient = frappe.get_doc("Patient", sales_invoice.patient)
         
+        # Prepare customer data using patient info if available
         customer_data = {
-            "email": customer.email_id or f"customer_{customer.name.lower()}@example.com",
-            "first_name": first_name,
-            "last_name": last_name,
-            "phone": customer.mobile_no,
+            "email": (patient.email if patient else customer.email_id) or f"customer_{customer.name.lower()}@example.com",
+            "first_name": patient.first_name if patient else customer.customer_name,
+            "last_name": patient.last_name if patient else "",
+            "phone": patient.mobile if patient else customer.mobile_no,
             "metadata": {
                 "erp_customer_id": customer.name,
-                "patient": sales_invoice.patient if hasattr(sales_invoice, 'patient') else None
+                "patient_id": patient.name if patient else None
             }
         }
         
