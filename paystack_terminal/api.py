@@ -20,7 +20,7 @@ def verify_payment(amount, reference, invoice):
             "Content-Type": "application/json"
         }
         
-        # Get invoice, customer and patient details
+        # Get invoice, customer, and patient details
         sales_invoice = frappe.get_doc("Sales Invoice", invoice)
         customer = frappe.get_doc("Customer", sales_invoice.customer)
         
@@ -42,8 +42,9 @@ def verify_payment(amount, reference, invoice):
         }
         
         # Check if customer exists in Paystack
-        if not customer.get("paystack_customer_code"):
-            # Create new customer
+        paystack_customer_code = customer.get("paystack_customer_code")
+        if not paystack_customer_code:
+            # Create new customer in Paystack
             customer_response = requests.post(
                 "https://api.paystack.co/customer",
                 headers=headers,
@@ -53,13 +54,17 @@ def verify_payment(amount, reference, invoice):
             if customer_response.status_code == 200:
                 customer_result = customer_response.json()
                 if customer_result.get("status"):
+                    paystack_customer_code = customer_result["data"]["customer_code"]
                     customer.db_set(
                         "paystack_customer_code",
-                        customer_result["data"]["customer_code"],
+                        paystack_customer_code,
                         update_modified=False
                     )
+            else:
+                frappe.logger().error(f"Failed to create customer in Paystack: {customer_response.text}")
+                frappe.throw(_("Failed to create customer in Paystack"))
         
-        # Prepare metadata
+        # Prepare metadata for the transaction
         metadata = {
             "invoice_no": invoice,
             "customer_name": customer.customer_name,
@@ -73,10 +78,13 @@ def verify_payment(amount, reference, invoice):
         update_url = f"https://api.paystack.co/transaction/{reference}"
         update_data = {
             "metadata": metadata,
-            "customer": customer.get("paystack_customer_code")
+            "customer": paystack_customer_code
         }
         
-        requests.put(update_url, headers=headers, json=update_data)
+        update_response = requests.put(update_url, headers=headers, json=update_data)
+        if update_response.status_code != 200:
+            frappe.logger().error(f"Failed to update transaction in Paystack: {update_response.text}")
+            frappe.throw(_("Could not update transaction in Paystack"))
         
         # Verify transaction with Paystack
         verify_url = f"https://api.paystack.co/transaction/verify/{reference}"
@@ -114,19 +122,24 @@ def handle_webhook():
             # Log webhook data for debugging
             frappe.logger().debug(f"Paystack Webhook Data: {data}")
             
+            # Ensure data is a dictionary
+            if not isinstance(data, dict):
+                frappe.logger().error("Invalid webhook data format")
+                return {'status': 'error', 'message': 'Invalid data format'}
+            
             # Process based on event type
             event = data.get('event')
             if event == "charge.success":
                 # Process immediately but don't wait
                 frappe.enqueue(
                     'paystack_terminal.api.handle_successful_charge',
-                    data=data.get('data'),
+                    data=data.get('data', {}),  # Ensure this is a dict
                     queue='short'
                 )
             elif event == "paymentrequest.success":
                 frappe.enqueue(
                     'paystack_terminal.api.handle_successful_payment_request',
-                    data=data.get('data'),
+                    data=data.get('data', {}),
                     queue='short'
                 )
                 
