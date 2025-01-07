@@ -15,6 +15,7 @@ E --> F[Payment Entry Created]
 F --> G[Invoice Marked Paid]
 style A fill:#f9f,stroke:#333,stroke-width:2px
 style G fill:#9f9,stroke:#333,stroke-width:2px
+```
 
 ### Features
 
