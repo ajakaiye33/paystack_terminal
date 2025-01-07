@@ -14,7 +14,7 @@ frappe.ui.form.on('Sales Invoice', {
                     callback: function(r) {
                         if(r.message && r.message.success) {
                             frappe.show_alert({
-                                message: __('Payment request sent to terminal. Please complete payment on the device.'),
+                                message: __('Payment request sent to terminal. Please complete payment on the POS device.'),
                                 indicator: 'green'
                             });
                         }

@@ -6,7 +6,7 @@ with open("requirements.txt") as f:
 setup(
 	name="paystack_terminal",
 	version="1.0.0",
-	description="Paystack Terminal Integration for ERPNext Healthcare",
+	description="Paystack Terminal Integration for ERPNext",
 	author="Gemutanalytics",
 	author_email="dev@gemutanalytics.com",
 	packages=find_packages(),
