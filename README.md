@@ -59,7 +59,7 @@ If you find this project useful, consider:
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/ajakaiye33)
 
-give it a star ⭐  👆 
+Please give it a star ⭐  👆 
 
 ## License
 
