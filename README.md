@@ -7,7 +7,7 @@ A seamless integration of Paystack POS Terminal with ERPNext for efficient payme
 ```mermaid
 graph TD
 
-A[Sales Invoice Created] --> B[Click Process Payment with Paystack Terminal]
+A[Sales Invoice Created/Submitted] --> B[Click Process Payment with Paystack Terminal]
 B --> C[Initialize Terminal]
 C --> D[Customer Pays on POS]
 D --> E[Webhook Notification]
@@ -35,6 +35,7 @@ style G fill:#9f9,stroke:#333,stroke-width:2px
 ```
 bench get-app https://github.com/yourusername/paystack_terminal.git
 bench --site your-site.com install-app paystack_terminal
+bench --site your-site.com migrate
 ```
 
 ## Configuration
