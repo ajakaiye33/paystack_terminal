@@ -67,7 +67,6 @@ MIT License
 
 ## Author
 
-Your Name
 - GitHub: [@ajakaiye](https://github.com/ajakaiye33)
 - Twitter: [@ajakz](https://twitter.com/ajakzheddy)
 
