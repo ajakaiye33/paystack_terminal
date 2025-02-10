@@ -1,3 +1,9 @@
+"""
+Author:Hedgar Ajakaiye
+Date: January 02, 2025
+Description: A custom module for integrating Paystack Terminal with ERPNext
+"""
+
 import frappe
 from frappe import _
 from frappe.model.document import Document

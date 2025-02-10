@@ -1,3 +1,9 @@
+"""
+Author:Hedgar Ajakaiye
+Date: January 02, 2025
+Description: A custom module for integrating Paystack Terminal with ERPNext
+"""
+
 app_name = "paystack_terminal"
 app_title = "Paystack Terminal"
 app_publisher = "Gemutanalytics"
