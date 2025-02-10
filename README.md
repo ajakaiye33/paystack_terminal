@@ -33,7 +33,7 @@ style G fill:#9f9,stroke:#333,stroke-width:2px
 1. From your site directory:
 
 ```
-bench get-app https://github.com/yourusername/paystack_terminal.git
+bench get-app https://github.com/ajakaiye33/paystack_terminal.git
 bench --site your-site.com install-app paystack_terminal
 bench --site your-site.com migrate
 ```
