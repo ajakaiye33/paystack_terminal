@@ -37,37 +37,22 @@ def handle_webhook():
             event = data.get('event')
             webhook_data = data.get('data', {})
             
-            # Extract references for deduplication
-            reference = None
-            offline_reference = None
-            
+            # ONLY process charge.success events, ignore paymentrequest.success
             if event == "charge.success":
                 reference = webhook_data.get("reference")
-            elif event == "paymentrequest.success":
-                offline_reference = webhook_data.get("offline_reference")
-            
-            # Check for existing payment entries with either reference
-            if reference and frappe.db.exists("Payment Entry", {"reference_no": reference}):
-                frappe.logger().info(f"Payment already processed for reference: {reference}")
-                return {'status': 'success'}
                 
-            if offline_reference and frappe.db.exists("Payment Entry", {"reference_no": offline_reference}):
-                frappe.logger().info(f"Payment already processed for offline_reference: {offline_reference}")
-                return {'status': 'success'}
-            
-            # Process the event
-            if event == "charge.success" and reference:
-                frappe.enqueue(
-                    'paystack_terminal.api.handle_successful_charge',
-                    data=webhook_data,
-                    queue='short'
-                )
-            elif event == "paymentrequest.success" and offline_reference:
-                frappe.enqueue(
-                    'paystack_terminal.api.handle_successful_payment_request',
-                    data=webhook_data,
-                    queue='short'
-                )
+                # Check if payment entry already exists
+                if reference and frappe.db.exists("Payment Entry", {"reference_no": reference}):
+                    frappe.logger().info(f"Payment already processed for reference: {reference}")
+                else:
+                    frappe.enqueue(
+                        'paystack_terminal.api.handle_successful_charge',
+                        data=webhook_data,
+                        queue='short'
+                    )
+            else:
+                # Log other events but don't process them
+                frappe.logger().info(f"Ignoring Paystack event: {event}")
                 
             # Return 200 OK immediately
             return {'status': 'success'}
@@ -88,44 +73,35 @@ def handle_successful_charge(data):
         amount = float(data.get("amount", 0)) / 100  # Convert from kobo to naira
         metadata = data.get("metadata", {})
         
-        # Check if payment entry already exists with either reference or offline_reference
+        # Double-check if payment entry already exists
         if frappe.db.exists("Payment Entry", {"reference_no": reference}):
             frappe.logger().info(f"Payment already processed for reference: {reference}")
             return
             
-        # Also check if there's an entry with offline_reference from metadata
-        offline_reference = metadata.get("offline_reference")
-        if offline_reference and frappe.db.exists("Payment Entry", {"reference_no": offline_reference}):
-            frappe.logger().info(f"Payment already processed for offline_reference: {offline_reference}")
-            return
-            
-        create_payment_entry(reference, amount, metadata.get("invoice_no"), metadata)
+        # Look for the invoice using terminal_reference from Sales Invoice
+        invoice_no = metadata.get("invoice_no")
+        if not invoice_no:
+            # Try to find invoice by terminal_reference
+            invoices = frappe.get_all(
+                "Sales Invoice", 
+                filters={"terminal_reference": reference, "status": "Unpaid"},
+                fields=["name"]
+            )
+            if invoices:
+                invoice_no = invoices[0].name
+                
+        create_payment_entry(reference, amount, invoice_no, metadata)
             
     except Exception as e:
         frappe.logger().error(f"Charge Processing Error: {str(e)}")
 
 def handle_successful_payment_request(data):
-    """Handle successful payment request notification"""
-    try:
-        offline_reference = data.get("offline_reference")
-        amount = float(data.get("amount", 0)) / 100  # Convert from kobo to naira
-        metadata = data.get("metadata", {})
-        
-        # Check if payment entry already exists with offline_reference
-        if frappe.db.exists("Payment Entry", {"reference_no": offline_reference}):
-            frappe.logger().info(f"Payment already processed for offline_reference: {offline_reference}")
-            return
-            
-        # Also check if there's an entry with the transaction reference
-        transaction_reference = data.get("reference") or metadata.get("reference")
-        if transaction_reference and frappe.db.exists("Payment Entry", {"reference_no": transaction_reference}):
-            frappe.logger().info(f"Payment already processed for transaction reference: {transaction_reference}")
-            return
-            
-        create_payment_entry(offline_reference, amount, metadata.get("invoice_no"), metadata)
-            
-    except Exception as e:
-        frappe.logger().error(f"Payment Request Processing Error: {str(e)}")
+    """
+    DEPRECATED: This function is no longer used as we only process charge.success events.
+    Kept for reference and backward compatibility.
+    """
+    frappe.logger().warning("handle_successful_payment_request called but is deprecated")
+    return
 
 def create_payment_entry(reference, amount, invoice=None, metadata=None):
     """Create a Payment Entry for successful Paystack payments"""
